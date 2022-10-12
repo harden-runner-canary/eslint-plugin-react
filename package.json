@@ -1,5 +1,5 @@
 {
-  "name": "eslint-plugin-react",
+  "name": "@step-security/eslint-plugin-react",
   "version": "7.31.10",
   "author": "Yannick Croissant <yannick.croissant+npm@gmail.com>",
   "description": "React specific linting rules for ESLint",
