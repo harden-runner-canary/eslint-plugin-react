@@ -1,0 +1,135 @@
+name: Publish Package to npm
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish'     
+        required: true        
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      is-new-version: ${{ steps.cpv.outputs.is-new-version }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      
+      - name: Match semver pattern
+        uses: actions-ecosystem/action-regex-match@v2
+        id: regex-match
+        with:
+          text: ${{ github.event.inputs.tag }}
+          regex: '^v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)$'
+      
+      - name: Check package version
+        id: cpv
+        uses: PostHog/check-package-version@v2
+        
+      - name: Validate tag
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const match = `${{ steps.regex-match.outputs.match }}`;
+            if(match === '') {
+              core.setFailed(`Tag ${context.payload.inputs.tag} does not match semver pattern`);
+            } else {
+              const isNewVersion = `${{ steps.cpv.outputs.is-new-version }}`;
+              if(isNewVersion === 'true') {
+                console.log(`Version ${context.payload.inputs.tag} has not been published yet`);                
+              } else {
+                core.setFailed(`Version ${context.payload.inputs.tag} is already published`);
+              }
+            }
+  check-status:
+    needs: check-version
+    if: needs.check-version.outputs.is-new-version == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify checks passed
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          retries: 3
+          script: |
+            console.log(`Checking status checks for ${context.payload.inputs.tag}`);
+            
+            const check_suites = await github.rest.checks.listSuitesForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: context.payload.inputs.tag
+              });
+              
+            for (const check_suite of check_suites.data.check_suites) {
+              if (check_suite.status !== 'completed') {
+                core.setFailed(`Some workflows for ${context.payload.inputs.tag} are still in-progress`);
+              }
+            }
+              
+            const branch = await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: context.payload.repository.default_branch
+            });
+            
+            for (const requiredCheck of branch.data.protection.required_status_checks.checks) {
+              
+              const check_runs = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: context.payload.inputs.tag,
+                check_name: requiredCheck.context
+              });
+              
+              for (const check_run of check_runs.data.check_runs) {
+                if (!(check_run.status === 'completed' && check_run.conclusion === 'success')){
+                  console.log(`${check_run.name} check failed`);
+                  core.setFailed(`Required status check ${check_run.name} did not succeed`);
+                }
+                console.log(`${check_run.name} check passed`);
+              }              
+            }
+            
+  publish:
+    needs: check-status
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: step-security/harden-runner@v1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            hooks.slack.com:443
+            prod.api.stepsecurity.io:443
+            registry.npmjs.org:443
+      
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "16.x"
+          registry-url: "https://registry.npmjs.org"
+      
+      - run: npm install
+      
+      - uses: step-security/wait-for-secrets@v1
+        id: wait-for-secrets
+        with:
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          secrets: |
+            OTP: 
+              name: 'OTP to publish package'
+              description: 'OTP from authenticator app'
+      
+      - run: npm publish --access public --otp ${{ steps.wait-for-secrets.outputs.OTP }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
