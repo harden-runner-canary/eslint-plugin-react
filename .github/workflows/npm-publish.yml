@@ -106,6 +106,7 @@ jobs:
           allowed-endpoints: >
             github.com:443
             hooks.slack.com:443
+            nodejs.org:443
             prod.api.stepsecurity.io:443
             registry.npmjs.org:443
       
