@@ -19,13 +19,6 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag }}
       
-      - name: Match semver pattern
-        uses: actions-ecosystem/action-regex-match@v2
-        id: regex-match
-        with:
-          text: ${{ github.event.inputs.tag }}
-          regex: '^v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)$'
-      
       - name: Check package version
         id: cpv
         uses: PostHog/check-package-version@v2
@@ -34,16 +27,20 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const match = `${{ steps.regex-match.outputs.match }}`;
-            if(match === '') {
-              core.setFailed(`Tag ${context.payload.inputs.tag} does not match semver pattern`);
-            } else {
+            const semver = require('semver')
+            
+            const tag = ${context.payload.inputs.tag};
+            const version = tag.substring(1);
+            
+            if (semver.valid(version)) {
               const isNewVersion = `${{ steps.cpv.outputs.is-new-version }}`;
-              if(isNewVersion === 'true') {
+              if (isNewVersion === 'true') {
                 console.log(`Version ${context.payload.inputs.tag} has not been published yet`);                
               } else {
                 core.setFailed(`Version ${context.payload.inputs.tag} is already published`);
-              }
+              }              
+            } else {
+              core.setFailed(`Tag ${context.payload.inputs.tag} does not match semver pattern`);
             }
   check-status:
     needs: check-version
@@ -86,7 +83,7 @@ jobs:
               });
               
               for (const check_run of check_runs.data.check_runs) {
-                if (!(check_run.status === 'completed' && check_run.conclusion === 'success')){
+                if (check_run.status !== 'completed' || check_run.conclusion !== 'success')) {
                   console.log(`${check_run.name} check failed`);
                   core.setFailed(`Required status check ${check_run.name} did not succeed`);
                 }
@@ -114,12 +111,15 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag }}
       
-      - uses: actions/setup-node@v3
+      - uses: ljharb/actions/node/install@main
+        name: 'nvm install lts/* && npm install'
         with:
-          node-version: "16.x"
-          registry-url: "https://registry.npmjs.org"
+          node-version: 'lts/*'
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: true
       
       - run: npm install
+      - run: npm publish --dry-run
       
       - uses: step-security/wait-for-secrets@v1
         id: wait-for-secrets
