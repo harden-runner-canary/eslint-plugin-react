@@ -22,7 +22,9 @@ jobs:
       - name: Check package version
         id: cpv
         uses: PostHog/check-package-version@v2
-        
+      
+      - run: npm install semver
+      
       - name: Validate tag
         uses: actions/github-script@v6
         with:
