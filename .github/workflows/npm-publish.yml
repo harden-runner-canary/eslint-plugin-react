@@ -85,7 +85,7 @@ jobs:
               });
               
               for (const check_run of check_runs.data.check_runs) {
-                if (check_run.status !== 'completed' || check_run.conclusion !== 'success')) {
+                if (check_run.status !== 'completed' || check_run.conclusion !== 'success') {
                   console.log(`${check_run.name} check failed`);
                   core.setFailed(`Required status check ${check_run.name} did not succeed`);
                 }
