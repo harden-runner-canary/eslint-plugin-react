@@ -19,13 +19,14 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag }}
       
-      - run: npx semver ${{ inputs.tag }}
+      - name: Validate semver pattern
+        run: npx semver ${{ inputs.tag }}
       
       - name: Check package version
         id: cpv
         uses: PostHog/check-package-version@v2
         
-      - name: Validate tag
+      - name: Validate package version
         uses: actions/github-script@v6
         with:
           script: |
@@ -96,7 +97,6 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             github.com:443
-            hooks.slack.com:443
             nodejs.org:443
             prod.api.stepsecurity.io:443
             registry.npmjs.org:443
