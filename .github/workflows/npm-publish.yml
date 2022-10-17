@@ -19,31 +19,22 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag }}
       
+      - run: npx semver ${context.payload.inputs.tag}
+      
       - name: Check package version
         id: cpv
         uses: PostHog/check-package-version@v2
-      
-      - run: npm install semver
-      
+        
       - name: Validate tag
         uses: actions/github-script@v6
         with:
           script: |
-            const semver = require('semver')
-            
-            const tag = `${context.payload.inputs.tag}`;
-            const version = tag.substring(1);
-            
-            if (semver.valid(version)) {
-              const isNewVersion = `${{ steps.cpv.outputs.is-new-version }}`;
-              if (isNewVersion === 'true') {
+            const isNewVersion = `${{ steps.cpv.outputs.is-new-version }}`;
+            if (isNewVersion === 'true') {
                 console.log(`Version ${context.payload.inputs.tag} has not been published yet`);                
-              } else {
-                core.setFailed(`Version ${context.payload.inputs.tag} is already published`);
-              }              
             } else {
-              core.setFailed(`Tag ${context.payload.inputs.tag} does not match semver pattern`);
-            }
+                core.setFailed(`Version ${context.payload.inputs.tag} is already published`);
+            }                          
   check-status:
     needs: check-version
     if: needs.check-version.outputs.is-new-version == 'true'
