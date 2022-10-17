@@ -19,7 +19,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag }}
       
-      - run: npx semver `${context.payload.inputs.tag}`
+      - run: npx semver `${{ context.payload.inputs.tag }}`
       
       - name: Check package version
         id: cpv
