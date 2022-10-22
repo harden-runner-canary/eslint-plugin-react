@@ -9,6 +9,11 @@ jobs:
       latest: ${{ steps.set-matrix.outputs.requireds }}
       minors: ${{ steps.set-matrix.outputs.optionals }}
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v1
+        with:
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - uses: ljharb/actions/node/matrix@main
         id: set-matrix
         with:
@@ -94,6 +99,11 @@ jobs:
             eslint: 5
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@int
+        with:
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - uses: actions/checkout@v2
       - uses: ljharb/actions/node/install@main
         name: 'nvm install ${{ matrix.node-version }} && npm install'
@@ -114,4 +124,9 @@ jobs:
     needs: [latest]
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@int
+        with:
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - run: 'echo tests completed'
